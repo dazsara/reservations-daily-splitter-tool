@@ -19,7 +19,7 @@ def split_reservations(df: pd.DataFrame) -> pd.DataFrame:
     df["Departure"] = pd.to_datetime(df["Departure"], dayfirst=True, errors="coerce")
     df["Booking Date"] = pd.to_datetime(df["Booking Date"], dayfirst=True, errors="coerce")
 
-    # Create stay dates list per reservation
+    # Create stay dates list per reservation (Arrival to day before Departure)
     df["Stay_dates"] = [
         pd.date_range(start, end - pd.Timedelta(days=1), freq="D")
         for start, end in zip(df["Arrival"], df["Departure"])
@@ -32,51 +32,43 @@ def split_reservations(df: pd.DataFrame) -> pd.DataFrame:
     df_daily["Date"] = pd.to_datetime(df_daily["Stay_dates"], errors="coerce")
     df_daily.drop(columns=["Stay_dates"], inplace=True)
 
-    # Total nights per reservation (used for revenue splitting)
+    # Total nights per reservation (for revenue splitting)
     total_nights = df_daily.groupby("Reservation Number")["Date"].transform("size")
 
     # In the DAILY view, each row = one night
     df_daily["Nights"] = 1
 
-    # Revenue per night, using total_nights for the division
-    df_daily["Base revenue"] = (
-        df_daily["Base Revenue"] / total_nights
-    ).round(2)
-    df_daily["Total revenue"] = (
-        df_daily["Total Revenue"] / total_nights
-    ).round(2)
+    # 👉 Overwrite Base/Total Revenue with per-night values
+    df_daily["Base Revenue"] = (df_daily["Base Revenue"] / total_nights).round(2)
+    df_daily["Total Revenue"] = (df_daily["Total Revenue"] / total_nights).round(2)
 
-    # ----- Stay Month / Book Month / Stay Year -----
-    df_daily["Stay Month"] = (
-        df_daily["Date"].dt.month.astype(str)
-        + "-"
-        + df_daily["Date"].dt.month_name()
-        + "-"
-        + df_daily["Date"].dt.year.astype(str)
-    )
-
-    df_daily["Book Month"] = (
-        df_daily["Booking Date"].dt.month.astype(str)
-        + "-"
-        + df_daily["Booking Date"].dt.month_name()
-        + "-"
-        + df_daily["Booking Date"].dt.year.astype(str)
-    )
-
-    df_daily["Stay Year"] = df_daily["Date"].dt.year
-
-    # ----- Rename Channel -> Sub Channel in the daily sheet -----
+    # Rename Channel -> Sub Channel in the daily sheet
     if "Channel" in df_daily.columns:
         df_daily = df_daily.rename(columns={"Channel": "Sub Channel"})
 
-    # ----- Remove Arrival and Departure from the daily split sheet -----
+    # Remove Arrival and Departure from the daily split sheet
     for col in ["Arrival", "Departure"]:
         if col in df_daily.columns:
             df_daily = df_daily.drop(columns=[col])
 
-    # ----- Format visible dates as dd-mm-yyyy for output -----
+    # Format Date and Booking Date as dd-mm-yyyy for output
     df_daily["Date"] = df_daily["Date"].dt.strftime("%d-%m-%Y")
     df_daily["Booking Date"] = df_daily["Booking Date"].dt.strftime("%d-%m-%Y")
+
+    # Keep only the desired columns, in this exact order
+    desired_cols = [
+        "Reservation Number",
+        "Apartment",
+        "Guest Name",
+        "Sub Channel",
+        "Date",
+        "Booking Date",
+        "Nights",
+        "Base Revenue",
+        "Total Revenue",
+    ]
+
+    df_daily = df_daily[desired_cols]
 
     return df_daily
 
