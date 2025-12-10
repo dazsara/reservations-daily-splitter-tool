@@ -39,10 +39,10 @@ def split_reservations(df: pd.DataFrame) -> pd.DataFrame:
     df_daily["Nights"] = 1
 
     # Revenue per night, using total_nights for the division
-    df_daily["Base revenue per night"] = (
+    df_daily["Base revenue"] = (
         df_daily["Base Revenue"] / total_nights
     ).round(2)
-    df_daily["Total revenue per night"] = (
+    df_daily["Total revenue"] = (
         df_daily["Total Revenue"] / total_nights
     ).round(2)
 
