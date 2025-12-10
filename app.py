@@ -4,6 +4,10 @@ from io import BytesIO
 
 
 def split_reservations(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Take the original reservations df and return a daily-split df.
+    This function does NOT modify the original df passed in.
+    """
     # Work on a copy so df_input stays clean
     df = df.copy()
 
@@ -15,7 +19,7 @@ def split_reservations(df: pd.DataFrame) -> pd.DataFrame:
     df["Departure"] = pd.to_datetime(df["Departure"], dayfirst=True, errors="coerce")
     df["Booking Date"] = pd.to_datetime(df["Booking Date"], dayfirst=True, errors="coerce")
 
-    # Create stay dates list per reservation 
+    # Create stay dates list per reservation
     df["Stay_dates"] = [
         pd.date_range(start, end - pd.Timedelta(days=1), freq="D")
         for start, end in zip(df["Arrival"], df["Departure"])
@@ -42,10 +46,36 @@ def split_reservations(df: pd.DataFrame) -> pd.DataFrame:
         df_daily["Total Revenue"] / total_nights
     ).round(2)
 
-    # Format dates as dd-mm-yyyy for output
+    # ----- Stay Month / Book Month / Stay Year -----
+    df_daily["Stay Month"] = (
+        df_daily["Date"].dt.month.astype(str)
+        + "-"
+        + df_daily["Date"].dt.month_name()
+        + "-"
+        + df_daily["Date"].dt.year.astype(str)
+    )
+
+    df_daily["Book Month"] = (
+        df_daily["Booking Date"].dt.month.astype(str)
+        + "-"
+        + df_daily["Booking Date"].dt.month_name()
+        + "-"
+        + df_daily["Booking Date"].dt.year.astype(str)
+    )
+
+    df_daily["Stay Year"] = df_daily["Date"].dt.year
+
+    # ----- Rename Channel -> Sub Channel in the daily sheet -----
+    if "Channel" in df_daily.columns:
+        df_daily = df_daily.rename(columns={"Channel": "Sub Channel"})
+
+    # ----- Remove Arrival and Departure from the daily split sheet -----
+    for col in ["Arrival", "Departure"]:
+        if col in df_daily.columns:
+            df_daily = df_daily.drop(columns=[col])
+
+    # ----- Format visible dates as dd-mm-yyyy for output -----
     df_daily["Date"] = df_daily["Date"].dt.strftime("%d-%m-%Y")
-    df_daily["Arrival"] = df_daily["Arrival"].dt.strftime("%d-%m-%Y")
-    df_daily["Departure"] = df_daily["Departure"].dt.strftime("%d-%m-%Y")
     df_daily["Booking Date"] = df_daily["Booking Date"].dt.strftime("%d-%m-%Y")
 
     return df_daily
@@ -114,3 +144,4 @@ if uploaded_file is not None:
 
 else:
     st.info("Please upload an Excel file to begin.")
+
